@@ -1,0 +1,1788 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "factoryName": {
+            "type": "string",
+            "metadata": "Data Factory name",
+            "defaultValue": "tfg-adf"
+        },
+        "TFGBlob_connectionString": {
+            "type": "string",
+            "metadata": "Secure string for 'connectionString' of 'TFGBlob'"
+        },
+        "TFG_SQL_connectionString": {
+            "type": "string",
+            "metadata": "Secure string for 'connectionString' of 'TFG_SQL'"
+        },
+        "Batch_accessKey": {
+            "type": "string",
+            "metadata": "Secure string for 'accessKey' of 'Batch'"
+        },
+        "SpaceTrack_HTTP_properties_typeProperties_url": {
+            "type": "string",
+            "defaultValue": "https://www.space-track.org/ajaxauth/login"
+        },
+        "Batch_properties_typeProperties_accountName": {
+            "type": "string",
+            "defaultValue": "tfgbatchaccount"
+        },
+        "Batch_properties_typeProperties_batchUri": {
+            "type": "string",
+            "defaultValue": "https://tfgbatch.centralus.batch.azure.com"
+        },
+        "Batch_properties_typeProperties_poolName": {
+            "type": "string",
+            "defaultValue": "Windows4cores"
+        },
+		"UsernameSpacetrack": {
+            "type": "string",
+            "defaultValue": ""
+        },
+		"PasswordSpaceTrack": {
+            "type": "string",
+            "defaultValue": ""
+        },
+    },
+    "variables": {
+        "factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]",
+		"singleQuote":"'",
+		"bodySatCat":"[concat('{\n\t\"identity\": \"', parameters('UsernameSpacetrack'),'\",\n\t\"password\": \"',parameters('PasswordSpaceTrack'),'\",\n\t\"query\": \"https://www.space-track.org/basicspacedata/query/class/satcat/OBJECT_TYPE/PAYLOAD/orderby/NORAD_CAT_ID asc/format/csv/emptyresult/show\"\n}')]",
+	    "bodyTLE"   :"[concat('@{concat(',variables('singleQuote'),'{\n\t\"identity\": \"', parameters('UsernameSpacetrack'),'\",\n\t\"password\": \"',parameters('PasswordSpaceTrack'),'\",\n\t\"query\": \"https://www.space-track.org/basicspacedata/query/class/tle_latest/ORDINAL/1/NORAD_CAT_ID/,',variables('singleQuote'),',item().SatList,',variables('singleQuote'),'/format/csv\"\n}',variables('singleQuote'),')}')]"
+    },
+    "resources": [
+        {
+            "name": "[concat(parameters('factoryName'), '/TFG_SQL')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "TFG_SQL",
+                    "type": "LinkedServiceReference"
+                },
+                "parameters": {
+                    "tablename": {
+                        "type": "string"
+                    }
+                },
+                "annotations": [],
+                "type": "AzureSqlTable",
+                "schema": [],
+                "typeProperties": {
+                    "schema": {
+                        "value": "@split(dataset().tablename,'.')[0]",
+                        "type": "Expression"
+                    },
+                    "table": {
+                        "value": "@split(dataset().tablename,'.')[1]",
+                        "type": "Expression"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/TFG_SQL')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/SpaceTrackCSV')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "SpaceTrack_HTTP",
+                    "type": "LinkedServiceReference"
+                },
+                "annotations": [],
+                "type": "DelimitedText",
+                "typeProperties": {
+                    "location": {
+                        "type": "HttpServerLocation"
+                    },
+                    "columnDelimiter": ",",
+                    "escapeChar": "\\",
+                    "firstRowAsHeader": true,
+                    "quoteChar": "\""
+                },
+                "schema": []
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/SpaceTrack_HTTP')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/BlobCSV')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "TFGBlob",
+                    "type": "LinkedServiceReference"
+                },
+                "parameters": {
+                    "filename": {
+                        "type": "string"
+                    },
+                    "directory": {
+                        "type": "string"
+                    }
+                },
+                "annotations": [],
+                "type": "DelimitedText",
+                "typeProperties": {
+                    "location": {
+                        "type": "AzureBlobStorageLocation",
+                        "fileName": {
+                            "value": "@dataset().filename",
+                            "type": "Expression"
+                        },
+                        "folderPath": {
+                            "value": "@dataset().directory",
+                            "type": "Expression"
+                        },
+                        "container": "data"
+                    },
+                    "columnDelimiter": ",",
+                    "escapeChar": "\\",
+                    "firstRowAsHeader": true,
+                    "quoteChar": "\""
+                },
+                "schema": []
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/TFGBlob')]"
+            ]
+
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/BlobNoParams')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "TFGBlob",
+                    "type": "LinkedServiceReference"
+                },
+                "annotations": [],
+                "type": "Binary",
+                "typeProperties": {
+                    "location": {
+                        "type": "AzureBlobStorageLocation",
+                        "container": "data"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/TFGBlob')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/StdMag')]",
+            "type": "Microsoft.DataFactory/factories/triggers",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "runtimeState": "Started",
+                "pipelines": [
+                    {
+                        "pipelineReference": {
+                            "referenceName": "Get Std Mag",
+                            "type": "PipelineReference"
+                        },
+                        "parameters": {}
+                    }
+                ],
+                "type": "ScheduleTrigger",
+                "typeProperties": {
+                    "recurrence": {
+                        "frequency": "Week",
+                        "interval": 2,
+                        "startTime": "2020-10-04T19:34:00Z",
+                        "timeZone": "UTC",
+                        "schedule": {
+                            "minutes": [
+                                0
+                            ],
+                            "hours": [
+                                0
+                            ],
+                            "weekDays": [
+                                "Sunday"
+                            ]
+                        }
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/pipelines/Get Std Mag')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/DailyRun')]",
+            "type": "Microsoft.DataFactory/factories/triggers",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "runtimeState": "Started",
+                "pipelines": [
+                    {
+                        "pipelineReference": {
+                            "referenceName": "TFG_SAT",
+                            "type": "PipelineReference"
+                        },
+                        "parameters": {}
+                    }
+                ],
+                "type": "ScheduleTrigger",
+                "typeProperties": {
+                    "recurrence": {
+                        "frequency": "Day",
+                        "interval": 1,
+                        "startTime": "2020-09-30T18:00:00Z",
+                        "timeZone": "UTC",
+                        "schedule": {}
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/pipelines/TFG_SAT')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/GetSatCat')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Get SatCat from spacetrack",
+                        "type": "Copy",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "DelimitedTextSource",
+                                "storeSettings": {
+                                    "type": "HttpReadSettings",
+                                    "requestMethod": "POST",
+                                    "additionalHeaders": "Content-Type: application/json",
+                                    "requestBody": "[variables('bodySatCat')]",
+                                    "requestTimeout": ""
+                                },
+                                "formatSettings": {
+                                    "type": "DelimitedTextReadSettings"
+                                }
+                            },
+                            "sink": {
+                                "type": "AzureSqlSink",
+                                "preCopyScript": "truncate table dbo.stg_satcat",
+                                "disableMetricsCollection": false
+                            },
+                            "enableStaging": false
+                        },
+                        "inputs": [
+                            {
+                                "referenceName": "SpaceTrackCSV",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "referenceName": "TFG_SQL",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "tablename": {
+                                        "value": "dbo.stg_satcat",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Merge",
+                        "type": "SqlServerStoredProcedure",
+                        "dependsOn": [
+                            {
+                                "activity": "Get SatCat from spacetrack",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "storedProcedureName": "DBO.SP_MERGESATCAT"
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "TFG_SQL",
+                            "type": "LinkedServiceReference"
+                        }
+                    }
+                ],
+                "annotations": [],
+                "lastPublishTime": "2020-09-29T04:19:58Z"
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/datasets/SpaceTrackCSV')]",
+                "[concat(variables('factoryId'), '/datasets/TFG_SQL')]",
+                "[concat(variables('factoryId'), '/linkedServices/TFG_SQL')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/TFG_SAT')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Update SatCat",
+                        "type": "ExecutePipeline",
+                        "dependsOn": [],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "pipeline": {
+                                "referenceName": "GetSatCat",
+                                "type": "PipelineReference"
+                            },
+                            "waitOnCompletion": true,
+                            "parameters": {}
+                        }
+                    },
+                    {
+                        "name": "Get TLE Data",
+                        "type": "ExecutePipeline",
+                        "dependsOn": [
+                            {
+                                "activity": "Update SatCat",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "pipeline": {
+                                "referenceName": "GetTLE",
+                                "type": "PipelineReference"
+                            },
+                            "waitOnCompletion": true,
+                            "parameters": {}
+                        }
+                    },
+                    {
+                        "name": "Process Events",
+                        "type": "ExecutePipeline",
+                        "dependsOn": [
+                            {
+                                "activity": "Get TLE Data",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "pipeline": {
+                                "referenceName": "GetSatEvents",
+                                "type": "PipelineReference"
+                            },
+                            "waitOnCompletion": true,
+                            "parameters": {}
+                        }
+                    },
+                    {
+                        "name": "Wakeup node",
+                        "type": "Custom",
+                        "dependsOn": [
+                            {
+                                "activity": "Update SatCat",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "command": "cmd /c \"echo wakeup\"",
+                            "referenceObjects": {
+                                "linkedServices": [],
+                                "datasets": []
+                            }
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "Batch",
+                            "type": "LinkedServiceReference"
+                        }
+                    },
+                    {
+                        "name": "IfCalculateNeeded",
+                        "type": "IfCondition",
+                        "dependsOn": [
+                            {
+                                "activity": "ShouldPredict",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "expression": {
+                                "value": "@greater(activity('ShouldPredict').output.firstRow.Calculate,0)",
+                                "type": "Expression"
+                            },
+                            "ifTrueActivities": [
+                                {
+                                    "name": "ExecutePrediction",
+                                    "type": "ExecutePipeline",
+                                    "dependsOn": [],
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "pipeline": {
+                                            "referenceName": "GetSatPrediction",
+                                            "type": "PipelineReference"
+                                        },
+                                        "waitOnCompletion": true,
+                                        "parameters": {}
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "ShouldPredict",
+                        "type": "Lookup",
+                        "dependsOn": [
+                            {
+                                "activity": "Wakeup node",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "AzureSqlSource",
+                                "sqlReaderQuery": "select case when coalesce(abs(datediff(day,max(PredictionDate),getdate())),31)>30 then 1 else 0 end as Calculate\nfrom LastSatPrediction",
+                                "queryTimeout": "02:00:00",
+                                "partitionOption": "None"
+                            },
+                            "dataset": {
+                                "referenceName": "TFG_SQL",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "tablename": "dbo.dummy"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "annotations": [],
+                "lastPublishTime": "2020-10-31T04:54:18Z"
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/pipelines/GetSatCat')]",
+                "[concat(variables('factoryId'), '/pipelines/GetTLE')]",
+                "[concat(variables('factoryId'), '/pipelines/GetSatEvents')]",
+                "[concat(variables('factoryId'), '/linkedServices/Batch')]",
+                "[concat(variables('factoryId'), '/datasets/TFG_SQL')]",
+                "[concat(variables('factoryId'), '/pipelines/GetSatPrediction')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/GetTLE')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "GetIterations",
+                        "type": "Lookup",
+                        "dependsOn": [
+                            {
+                                "activity": "Clean staging",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "AzureSqlSource",
+                                "sqlReaderStoredProcedureName": "[[dbo].[GetTLEIterations]",
+                                "storedProcedureParameters": {
+                                    "lotCapacity": {
+                                        "type": "Int32",
+                                        "value": {
+                                            "value": "@pipeline().parameters.TLEBatchSize",
+                                            "type": "Expression"
+                                        }
+                                    }
+                                },
+                                "queryTimeout": "02:00:00",
+                                "partitionOption": "None"
+                            },
+                            "dataset": {
+                                "referenceName": "TFG_SQL",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "tablename": "dumm.y"
+                                }
+                            },
+                            "firstRowOnly": false
+                        }
+                    },
+                    {
+                        "name": "Clean staging",
+                        "type": "Lookup",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "AzureSqlSource",
+                                "sqlReaderQuery": "if object_id('dbo.stg_tle') is not null\ntruncate table stg_tle;\nselect 1",
+                                "queryTimeout": "02:00:00",
+                                "partitionOption": "None"
+                            },
+                            "dataset": {
+                                "referenceName": "TFG_SQL",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "tablename": "du.mmy"
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "name": "ForeachIteration",
+                        "type": "ForEach",
+                        "dependsOn": [
+                            {
+                                "activity": "GetIterations",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "items": {
+                                "value": "@activity('GetIterations').output.value",
+                                "type": "Expression"
+                            },
+                            "isSequential": true,
+                            "activities": [
+                                {
+                                    "name": "Insert TLE",
+                                    "type": "Copy",
+                                    "dependsOn": [],
+                                    "policy": {
+                                        "timeout": "7.00:00:00",
+                                        "retry": 0,
+                                        "retryIntervalInSeconds": 30,
+                                        "secureOutput": false,
+                                        "secureInput": false
+                                    },
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "source": {
+                                            "type": "DelimitedTextSource",
+                                            "storeSettings": {
+                                                "type": "HttpReadSettings",
+                                                "requestMethod": "POST",
+                                                "additionalHeaders": "Content-Type: application/json",
+                                                "requestBody": {
+                                                    "value": "[variables('bodyTLE')]",
+                                                    "type": "Expression"
+                                                },
+                                                "requestTimeout": ""
+                                            },
+                                            "formatSettings": {
+                                                "type": "DelimitedTextReadSettings"
+                                            }
+                                        },
+                                        "sink": {
+                                            "type": "AzureSqlSink",
+                                            "tableOption": "autoCreate"
+                                        },
+                                        "enableStaging": false,
+                                        "translator": {
+                                            "type": "TabularTranslator",
+                                            "typeConversion": true,
+                                            "typeConversionSettings": {
+                                                "allowDataTruncation": true,
+                                                "treatBooleanAsNumber": false
+                                            }
+                                        }
+                                    },
+                                    "inputs": [
+                                        {
+                                            "referenceName": "SpaceTrackCSV",
+                                            "type": "DatasetReference",
+                                            "parameters": {}
+                                        }
+                                    ],
+                                    "outputs": [
+                                        {
+                                            "referenceName": "TFG_SQL",
+                                            "type": "DatasetReference",
+                                            "parameters": {
+                                                "tablename": "dbo.stg_tle"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "name": "Wait",
+                                    "description": "This activity is to avoid getting blocked due to max request quota",
+                                    "type": "Wait",
+                                    "dependsOn": [
+                                        {
+                                            "activity": "Insert TLE",
+                                            "dependencyConditions": [
+                                                "Completed"
+                                            ]
+                                        }
+                                    ],
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "waitTimeInSeconds": 20
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "Insert in TLE final table",
+                        "type": "SqlServerStoredProcedure",
+                        "dependsOn": [
+                            {
+                                "activity": "ForeachIteration",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "storedProcedureName": "[[dbo].[InsertTLE]"
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "TFG_SQL",
+                            "type": "LinkedServiceReference"
+                        }
+                    }
+                ],
+                "parameters": {
+                    "TLEBatchSize": {
+                        "type": "string",
+                        "defaultValue": "300"
+                    }
+                },
+                "annotations": [],
+                "lastPublishTime": "2020-10-02T01:27:48Z"
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/datasets/TFG_SQL')]",
+                "[concat(variables('factoryId'), '/linkedServices/TFG_SQL')]",
+                "[concat(variables('factoryId'), '/datasets/SpaceTrackCSV')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/GetSatEvents')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Copy TLE from SQL",
+                        "type": "Copy",
+                        "dependsOn": [
+                            {
+                                "activity": "Set BaseCommand",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "AzureSqlSource",
+                                "queryTimeout": "02:00:00",
+                                "partitionOption": "None"
+                            },
+                            "sink": {
+                                "type": "DelimitedTextSink",
+                                "storeSettings": {
+                                    "type": "AzureBlobStorageWriteSettings"
+                                },
+                                "formatSettings": {
+                                    "type": "DelimitedTextWriteSettings",
+                                    "quoteAllText": true,
+                                    "fileExtension": ".txt"
+                                }
+                            },
+                            "enableStaging": false,
+                            "translator": {
+                                "type": "TabularTranslator",
+                                "typeConversion": true,
+                                "typeConversionSettings": {
+                                    "allowDataTruncation": true,
+                                    "treatBooleanAsNumber": false
+                                }
+                            }
+                        },
+                        "inputs": [
+                            {
+                                "referenceName": "TFG_SQL",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "tablename": "dbo.TLE_Latest"
+                                }
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "referenceName": "BlobCSV",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "filename": "tle.csv",
+                                    "directory": "tle"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Set DayFrom",
+                        "type": "SetVariable",
+                        "dependsOn": [
+                            {
+                                "activity": "CleanFolder",
+                                "dependencyConditions": [
+                                    "Completed"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "variableName": "DayFrom",
+                            "value": {
+                                "value": "@substring(string(addhours(utcnow(),-6)),0,10)",
+                                "type": "Expression"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Set DayTo",
+                        "type": "SetVariable",
+                        "dependsOn": [
+                            {
+                                "activity": "Set DayFrom",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "variableName": "DayTo",
+                            "value": {
+                                "value": "@substring(string(adddays(variables('DayFrom'),1)),0,10)",
+                                "type": "Expression"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Get Cities",
+                        "type": "Lookup",
+                        "dependsOn": [
+                            {
+                                "activity": "Copy TLE from SQL",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "AzureSqlSource",
+                                "queryTimeout": "02:00:00",
+                                "partitionOption": "None"
+                            },
+                            "dataset": {
+                                "referenceName": "TFG_SQL",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "tablename": "dbo.Cities"
+                                }
+                            },
+                            "firstRowOnly": false
+                        }
+                    },
+                    {
+                        "name": "Foreach City",
+                        "type": "ForEach",
+                        "dependsOn": [
+                            {
+                                "activity": "Get Cities",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "items": {
+                                "value": "@activity('Get Cities').output.value",
+                                "type": "Expression"
+                            },
+                            "isSequential": true,
+                            "activities": [
+                                {
+                                    "name": "Calculate SatEvents",
+                                    "type": "Custom",
+                                    "dependsOn": [
+                                        {
+                                            "activity": "Generate Final Command",
+                                            "dependencyConditions": [
+                                                "Succeeded"
+                                            ]
+                                        }
+                                    ],
+                                    "policy": {
+                                        "timeout": "7.00:00:00",
+                                        "retry": 0,
+                                        "retryIntervalInSeconds": 30,
+                                        "secureOutput": false,
+                                        "secureInput": false
+                                    },
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "command": {
+                                            "value": "@variables('FinalCommand')",
+                                            "type": "Expression"
+                                        },
+                                        "resourceLinkedService": {
+                                            "referenceName": "TFGBlob",
+                                            "type": "LinkedServiceReference"
+                                        },
+                                        "folderPath": "data/tle",
+                                        "referenceObjects": {
+                                            "linkedServices": [
+                                                {
+                                                    "referenceName": "TFGBlob",
+                                                    "type": "LinkedServiceReference",
+                                                    "parameters": {}
+                                                }
+                                            ],
+                                            "datasets": []
+                                        }
+                                    },
+                                    "linkedServiceName": {
+                                        "referenceName": "Batch",
+                                        "type": "LinkedServiceReference"
+                                    }
+                                },
+                                {
+                                    "name": "CopyToTable",
+                                    "type": "Copy",
+                                    "dependsOn": [
+                                        {
+                                            "activity": "Calculate SatEvents",
+                                            "dependencyConditions": [
+                                                "Succeeded"
+                                            ]
+                                        }
+                                    ],
+                                    "policy": {
+                                        "timeout": "7.00:00:00",
+                                        "retry": 0,
+                                        "retryIntervalInSeconds": 30,
+                                        "secureOutput": false,
+                                        "secureInput": false
+                                    },
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "source": {
+                                            "type": "DelimitedTextSource",
+                                            "storeSettings": {
+                                                "type": "AzureBlobStorageReadSettings",
+                                                "recursive": true
+                                            },
+                                            "formatSettings": {
+                                                "type": "DelimitedTextReadSettings"
+                                            }
+                                        },
+                                        "sink": {
+                                            "type": "AzureSqlSink"
+                                        },
+                                        "enableStaging": false,
+                                        "translator": {
+                                            "type": "TabularTranslator",
+                                            "typeConversion": true,
+                                            "typeConversionSettings": {
+                                                "allowDataTruncation": true,
+                                                "treatBooleanAsNumber": false
+                                            }
+                                        }
+                                    },
+                                    "inputs": [
+                                        {
+                                            "referenceName": "BlobCSV",
+                                            "type": "DatasetReference",
+                                            "parameters": {
+                                                "filename": {
+                                                    "value": "@concat('satevents',item().City,'.csv')",
+                                                    "type": "Expression"
+                                                },
+                                                "directory": "joboutput"
+                                            }
+                                        }
+                                    ],
+                                    "outputs": [
+                                        {
+                                            "referenceName": "TFG_SQL",
+                                            "type": "DatasetReference",
+                                            "parameters": {
+                                                "tablename": "dbo.SatEvents"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "name": "Generate Final Command",
+                                    "type": "SetVariable",
+                                    "dependsOn": [],
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "variableName": "FinalCommand",
+                                        "value": {
+                                            "value": "@replace(\nreplace(\nreplace(\nreplace(\nreplace(variables('BaseCommand')\n        ,'|dayfrom|',variables('DayFrom')\n\t   ),'|dayto|',variables('DayTo')\n\t   ),'|elevation|',string(item().Elevation)\n\t   ),'|CityName|',item().City\n\t   ),'|Coordinates|',item().Coordinates\n\t   )\n",
+                                            "type": "Expression"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "CleanFolder",
+                        "type": "Delete",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "dataset": {
+                                "referenceName": "BlobNoParams",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            },
+                            "enableLogging": false,
+                            "storeSettings": {
+                                "type": "AzureBlobStorageReadSettings",
+                                "recursive": true,
+                                "wildcardFileName": "*.csv"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Set BaseCommand",
+                        "type": "SetVariable",
+                        "dependsOn": [
+                            {
+                                "activity": "Set DayTo",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "variableName": "BaseCommand",
+                            "value": "cmd /c \"%AZ_BATCH_APP_PACKAGE_satevents#0.4%\\SatellitePosition\\SatellitePosition.exe  --DayFrom \"|dayfrom|\" --DayTo \"|dayto|\" --tle .\\tle.csv --output .\\satevents|CityName|.csv --ephem .\\de421.bsp --CityName \"|CityName|\" --CityCoordinates \"|Coordinates|\" --CityElevation |elevation| && powershell %AZ_BATCH_APP_PACKAGE_FileUploader#2%\\uploadoutput.ps1 -jsonfile \"linkedServices.json\" -resultfilename \"satevents|CityName|.csv\" -blobfilename \"joboutput/satevents|CityName|.csv\"  \"\n"
+                        }
+                    }
+                ],
+                "variables": {
+                    "DayFrom": {
+                        "type": "String"
+                    },
+                    "DayTo": {
+                        "type": "String"
+                    },
+                    "BaseCommand": {
+                        "type": "String"
+                    },
+                    "FinalCommand": {
+                        "type": "String"
+                    }
+                },
+                "annotations": [],
+                "lastPublishTime": "2020-10-31T03:19:26Z"
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/datasets/TFG_SQL')]",
+                "[concat(variables('factoryId'), '/datasets/BlobCSV')]",
+                "[concat(variables('factoryId'), '/datasets/BlobNoParams')]",
+                "[concat(variables('factoryId'), '/linkedServices/TFGBlob')]",
+                "[concat(variables('factoryId'), '/linkedServices/Batch')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/Get Std Mag')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Data To SQL",
+                        "type": "Copy",
+                        "dependsOn": [
+                            {
+                                "activity": "Get STDMag",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "DelimitedTextSource",
+                                "storeSettings": {
+                                    "type": "AzureBlobStorageReadSettings",
+                                    "recursive": true
+                                },
+                                "formatSettings": {
+                                    "type": "DelimitedTextReadSettings"
+                                }
+                            },
+                            "sink": {
+                                "type": "AzureSqlSink",
+                                "preCopyScript": "truncate table [dbo].[stg_stdmag]",
+                                "tableOption": "autoCreate",
+                                "disableMetricsCollection": false
+                            },
+                            "enableStaging": false,
+                            "translator": {
+                                "type": "TabularTranslator",
+                                "mappings": [
+                                    {
+                                        "source": {
+                                            "name": "N#",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "NLINEA",
+                                            "physicalType": "String"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "NAME",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "NAME",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "NORAD",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "NORAD",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "INT.DESC.",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "INT.DESC.",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "PERIGEE[km]",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "PERIGEEkm",
+                                            "physicalType": "String"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "APOGEE[km]",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "APOGEEkm",
+                                            "physicalType": "String"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "PERIOD[min]",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "PERIODmin",
+                                            "physicalType": "String"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "RCS",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "RCS",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "STD.MAG",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "STDMAG",
+                                            "physicalType": "String"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "MAG.",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "MAG",
+                                            "physicalType": "String"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "EL.[deg]",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "EL.deg",
+                                            "physicalType": "String"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "DEC*[deg]",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "DECdeg",
+                                            "physicalType": "String"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "RA*[hour]",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "RAhour",
+                                            "physicalType": "String"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "INCL.[deg]",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "INCLdeg",
+                                            "physicalType": "String"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "ECC.",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "ECC",
+                                            "physicalType": "String"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "AGE[day]",
+                                            "type": "String",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "AGEday",
+                                            "physicalType": "String"
+                                        }
+                                    }
+                                ],
+                                "typeConversion": true,
+                                "typeConversionSettings": {
+                                    "allowDataTruncation": true,
+                                    "treatBooleanAsNumber": false
+                                }
+                            }
+                        },
+                        "inputs": [
+                            {
+                                "referenceName": "BlobCSV",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "filename": "satflare.csv",
+                                    "directory": "joboutput"
+                                }
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "referenceName": "TFG_SQL",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "tablename": "dbo.stg_stdmag"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Get STDMag",
+                        "type": "Custom",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "0.00:55:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "command": "cmd /c \"%AZ_BATCH_APP_PACKAGE_StandardMag#1%\\GetStandardMag.exe && powershell %AZ_BATCH_APP_PACKAGE_FileUploader#2%\\uploadoutput.ps1 -jsonfile \"linkedServices.json\" -resultfilename \"satflare.csv\" -blobfilename \"joboutput/satflare.csv\"\" \n",
+                            "resourceLinkedService": {
+                                "referenceName": "TFGBlob",
+                                "type": "LinkedServiceReference"
+                            },
+                            "folderPath": "data/tle",
+                            "referenceObjects": {
+                                "linkedServices": [
+                                    {
+                                        "referenceName": "TFGBlob",
+                                        "type": "LinkedServiceReference",
+                                        "parameters": {}
+                                    }
+                                ],
+                                "datasets": []
+                            }
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "Batch",
+                            "type": "LinkedServiceReference"
+                        }
+                    },
+                    {
+                        "name": "Merge Std Mag",
+                        "type": "SqlServerStoredProcedure",
+                        "dependsOn": [
+                            {
+                                "activity": "Data To SQL",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "storedProcedureName": "[[dbo].[MergeStdMag]"
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "TFG_SQL",
+                            "type": "LinkedServiceReference"
+                        }
+                    }
+                ],
+                "annotations": [],
+                "lastPublishTime": "2020-10-04T19:41:15Z"
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/datasets/BlobCSV')]",
+                "[concat(variables('factoryId'), '/datasets/TFG_SQL')]",
+                "[concat(variables('factoryId'), '/linkedServices/TFGBlob')]",
+                "[concat(variables('factoryId'), '/linkedServices/Batch')]",
+                "[concat(variables('factoryId'), '/linkedServices/TFG_SQL')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/GetSatPrediction')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Copy SatStats",
+                        "type": "Copy",
+                        "dependsOn": [
+                            {
+                                "activity": "Set BaseCommand",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "AzureSqlSource",
+                                "sqlReaderStoredProcedureName": "[[dbo].[GetSatStats]",
+                                "storedProcedureParameters": {
+                                    "startyear": {
+                                        "type": "Int32",
+                                        "value": {
+                                            "value": "1957",
+                                            "type": "Expression"
+                                        }
+                                    }
+                                },
+                                "queryTimeout": "02:00:00",
+                                "partitionOption": "None"
+                            },
+                            "sink": {
+                                "type": "DelimitedTextSink",
+                                "storeSettings": {
+                                    "type": "AzureBlobStorageWriteSettings"
+                                },
+                                "formatSettings": {
+                                    "type": "DelimitedTextWriteSettings",
+                                    "quoteAllText": true,
+                                    "fileExtension": ".txt"
+                                }
+                            },
+                            "enableStaging": false,
+                            "translator": {
+                                "type": "TabularTranslator",
+                                "typeConversion": true,
+                                "typeConversionSettings": {
+                                    "allowDataTruncation": true,
+                                    "treatBooleanAsNumber": false
+                                }
+                            }
+                        },
+                        "inputs": [
+                            {
+                                "referenceName": "TFG_SQL",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "tablename": "dbo.Dummy"
+                                }
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "referenceName": "BlobCSV",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "filename": "SatStatistics.csv",
+                                    "directory": "prediction"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "name": "CleanFolder",
+                        "type": "Delete",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "dataset": {
+                                "referenceName": "BlobNoParams",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            },
+                            "enableLogging": false,
+                            "storeSettings": {
+                                "type": "AzureBlobStorageReadSettings",
+                                "recursive": true,
+                                "wildcardFileName": "prediction/SatStatistics.csv"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Set BaseCommand",
+                        "type": "SetVariable",
+                        "dependsOn": [
+                            {
+                                "activity": "CleanFolder",
+                                "dependencyConditions": [
+                                    "Completed"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "variableName": "BaseCommand",
+                            "value": "cmd /c \"%AZ_BATCH_APP_PACKAGE_satelliteprediction#2.1%\\SatsFBProphet\\SatsFBProphet.exe  --output .\\SatPrediction.csv --input .\\SatStatistics.csv && powershell %AZ_BATCH_APP_PACKAGE_FileUploader#2%\\uploadoutput.ps1 -jsonfile \"linkedServices.json\" -resultfilename \"SatPrediction.csv\" -blobfilename \"joboutput/SatPrediction.csv\"  \"\n"
+                        }
+                    },
+                    {
+                        "name": "Calculate SatEvents",
+                        "type": "Custom",
+                        "dependsOn": [
+                            {
+                                "activity": "Copy SatStats",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "command": {
+                                "value": "@variables('BaseCommand')",
+                                "type": "Expression"
+                            },
+                            "resourceLinkedService": {
+                                "referenceName": "TFGBlob",
+                                "type": "LinkedServiceReference"
+                            },
+                            "folderPath": "data/prediction",
+                            "referenceObjects": {
+                                "linkedServices": [
+                                    {
+                                        "referenceName": "TFGBlob",
+                                        "type": "LinkedServiceReference",
+                                        "parameters": {}
+                                    }
+                                ],
+                                "datasets": []
+                            }
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "Batch",
+                            "type": "LinkedServiceReference"
+                        }
+                    },
+                    {
+                        "name": "CopyToTable",
+                        "type": "Copy",
+                        "dependsOn": [
+                            {
+                                "activity": "Calculate SatEvents",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "DelimitedTextSource",
+                                "storeSettings": {
+                                    "type": "AzureBlobStorageReadSettings",
+                                    "recursive": true
+                                },
+                                "formatSettings": {
+                                    "type": "DelimitedTextReadSettings"
+                                }
+                            },
+                            "sink": {
+                                "type": "AzureSqlSink"
+                            },
+                            "enableStaging": false,
+                            "translator": {
+                                "type": "TabularTranslator",
+                                "mappings": [
+                                    {
+                                        "source": {
+                                            "name": "MesAnno",
+                                            "type": "DateTime",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "MonthYearDate",
+                                            "type": "DateTime",
+                                            "physicalType": "date"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "NumSats",
+                                            "type": "Double",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "NumSats",
+                                            "type": "Double",
+                                            "physicalType": "float"
+                                        }
+                                    },
+                                    {
+                                        "source": {
+                                            "name": "Prediction",
+                                            "type": "Double",
+                                            "physicalType": "String"
+                                        },
+                                        "sink": {
+                                            "name": "Prediction",
+                                            "type": "Double",
+                                            "physicalType": "float"
+                                        }
+                                    }
+                                ],
+                                "typeConversion": true,
+                                "typeConversionSettings": {
+                                    "allowDataTruncation": true,
+                                    "treatBooleanAsNumber": false
+                                }
+                            }
+                        },
+                        "inputs": [
+                            {
+                                "referenceName": "BlobCSV",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "filename": "SatPrediction.csv",
+                                    "directory": "joboutput"
+                                }
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "referenceName": "TFG_SQL",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "tablename": "dbo.SatPrediction"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "variables": {
+                    "BaseCommand": {
+                        "type": "String"
+                    }
+                },
+                "annotations": [],
+                "lastPublishTime": "2020-11-21T06:04:00Z"
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/datasets/TFG_SQL')]",
+                "[concat(variables('factoryId'), '/datasets/BlobCSV')]",
+                "[concat(variables('factoryId'), '/datasets/BlobNoParams')]",
+                "[concat(variables('factoryId'), '/linkedServices/TFGBlob')]",
+                "[concat(variables('factoryId'), '/linkedServices/Batch')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/TFGBlob')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureBlobStorage",
+                "typeProperties": {
+                    "connectionString": "[parameters('TFGBlob_connectionString')]"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/SpaceTrack_HTTP')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "HttpServer",
+                "typeProperties": {
+                    "url": "[parameters('SpaceTrack_HTTP_properties_typeProperties_url')]",
+                    "enableServerCertificateValidation": false,
+                    "authenticationType": "Anonymous"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/TFG_SQL')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureSqlDatabase",
+                "typeProperties": {
+                    "connectionString": "[parameters('TFG_SQL_connectionString')]"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/Batch')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureBatch",
+                "typeProperties": {
+                    "accountName": "[parameters('Batch_properties_typeProperties_accountName')]",
+                    "accessKey": {
+                        "type": "SecureString",
+                        "value": "[parameters('Batch_accessKey')]"
+                    },
+                    "batchUri": "[parameters('Batch_properties_typeProperties_batchUri')]",
+                    "poolName": "[parameters('Batch_properties_typeProperties_poolName')]",
+                    "linkedServiceName": {
+                        "referenceName": "TFGBlob",
+                        "type": "LinkedServiceReference"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/TFGBlob')]"
+            ]
+        }
+    ]
+}
